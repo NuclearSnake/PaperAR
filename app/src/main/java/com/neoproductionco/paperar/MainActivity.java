@@ -4,10 +4,13 @@ import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.ImageFormat;
+import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.support.annotation.IntDef;
 import android.support.annotation.NonNull;
@@ -16,7 +19,11 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
+import android.view.Surface;
+import android.view.TextureView;
 import android.widget.Toast;
+
+import java.util.Arrays;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -24,11 +31,40 @@ public class MainActivity extends AppCompatActivity {
 	private CameraManager mCameraManager = null;
 	private CameraDevice activeCameraDevice = null;
 	private String activeCameraID = null;
+	private TextureView textureView;
+	private CameraCaptureSession mSession;
+	private boolean textureReady = false;
+	private boolean cameraReady = false;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
+
+		textureView = (TextureView) findViewById(R.id.textureView);
+		textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
+			@Override
+			public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+				textureReady = true;
+				if(textureReady && cameraReady)
+					createCameraPreviewSession();
+			}
+
+			@Override
+			public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
+
+			}
+
+			@Override
+			public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+				return false;
+			}
+
+			@Override
+			public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+
+			}
+		});
 
 		mCameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
 
@@ -52,8 +88,11 @@ public class MainActivity extends AppCompatActivity {
 		openCamera(mCameraManager, activeCameraID, new CameraDevice.StateCallback() {
 			@Override
 			public void onOpened(@NonNull CameraDevice camera) {
-				Log.i(MainActivity.LOG_TAG, "Open camera  with id:"+activeCameraDevice.getId());
 				activeCameraDevice = camera;
+				Log.i(MainActivity.LOG_TAG, "Open camera  with id:"+activeCameraDevice.getId());
+				cameraReady = true;
+				if(textureReady && cameraReady)
+					createCameraPreviewSession();
 			}
 
 			@Override
@@ -101,5 +140,44 @@ public class MainActivity extends AppCompatActivity {
 			Log.e(MainActivity.LOG_TAG,e.getMessage());
 			//e.printStackTrace();
 		}
+	}
+
+	private void createCameraPreviewSession() {
+		SurfaceTexture texture = textureView.getSurfaceTexture();
+		texture.setDefaultBufferSize(1920,1080);
+		Surface surface = new Surface(texture);
+
+		try {
+			final CaptureRequest.Builder builder =
+					activeCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+
+			builder.addTarget(surface);
+
+			activeCameraDevice.createCaptureSession(
+					Arrays.asList(surface),
+					new CameraCaptureSession.StateCallback() {
+
+						@Override
+						public void onConfigured(CameraCaptureSession session) {
+							mSession = session;
+							try {
+								mSession.setRepeatingRequest(builder.build(),null,null);
+							} catch (CameraAccessException e) {
+								e.printStackTrace();
+							}
+						}
+
+						@Override
+						public void onConfigureFailed(CameraCaptureSession session) {
+						}
+
+					},
+					null
+
+			);
+		} catch (CameraAccessException e) {
+			e.printStackTrace();
+		}
+
 	}
 }

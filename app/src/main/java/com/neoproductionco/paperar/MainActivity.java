@@ -1,183 +1,96 @@
 package com.neoproductionco.paperar;
 
 import android.Manifest;
-import android.content.Context;
+import android.app.Activity;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
-import android.graphics.ImageFormat;
-import android.graphics.SurfaceTexture;
-import android.hardware.camera2.CameraAccessException;
-import android.hardware.camera2.CameraCaptureSession;
-import android.hardware.camera2.CameraCharacteristics;
-import android.hardware.camera2.CameraDevice;
-import android.hardware.camera2.CameraManager;
-import android.hardware.camera2.CaptureRequest;
-import android.hardware.camera2.params.StreamConfigurationMap;
-import android.support.annotation.IntDef;
-import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
-import android.util.Size;
-import android.view.Surface;
 import android.view.TextureView;
+import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowManager;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
-import java.util.Arrays;
+import com.neoproductionco.paperar.MySurfaceView;
 
-public class MainActivity extends AppCompatActivity {
+/**
+ * Created by Neo on 21.09.2016.
+ */
 
-	private static final String LOG_TAG = "PaperAR logs";
-	private CameraManager mCameraManager = null;
-	private CameraDevice activeCameraDevice = null;
-	private String activeCameraID = null;
-	private TextureView textureView;
-	private CameraCaptureSession mSession;
-	private boolean textureReady = false;
-	private boolean cameraReady = false;
+public class MainActivity extends Activity {
+	private static final int REQUEST_PERMISSION_CAMERA = 1045;
 
+	MySurfaceView surfaceView;
+
+	/** Called when the activity is first created. */
 	@Override
-	protected void onCreate(Bundle savedInstanceState) {
+	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		setContentView(R.layout.activity_main);
-
-		textureView = (TextureView) findViewById(R.id.textureView);
-		textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
-			@Override
-			public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-				textureReady = true;
-				if(textureReady && cameraReady)
-					createCameraPreviewSession();
-			}
-
-			@Override
-			public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-
-			}
-
-			@Override
-			public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-				return false;
-			}
-
-			@Override
-			public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-
-			}
-		});
-
-		mCameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
-
-		try {
-			// Получения списка камер в устрйстве
-			String[] cameraList = mCameraManager.getCameraIdList();
-			for (String cameraID : cameraList) {
-				Log.i(LOG_TAG, "cameraID: " + cameraID);
-			}
-			activeCameraID = cameraList[0];
-
-			Log.i(LOG_TAG, "Cameras' characteristics to be printed");
-			for (String cameraID : cameraList) {
-				printCharacteristics(cameraID);
-			}
-		} catch (CameraAccessException e) {
-			Log.e(LOG_TAG, e.getMessage());
-			e.printStackTrace();
-		}
-
-		openCamera(mCameraManager, activeCameraID, new CameraDevice.StateCallback() {
-			@Override
-			public void onOpened(@NonNull CameraDevice camera) {
-				activeCameraDevice = camera;
-				Log.i(MainActivity.LOG_TAG, "Open camera  with id:"+activeCameraDevice.getId());
-				cameraReady = true;
-				if(textureReady && cameraReady)
-					createCameraPreviewSession();
-			}
-
-			@Override
-			public void onDisconnected(@NonNull CameraDevice camera) {
-				Log.i(MainActivity.LOG_TAG, "Disconnected camera  with id:"+activeCameraDevice.getId());
-				activeCameraDevice.close();
-				activeCameraDevice = null;
-			}
-
-			@Override
-			public void onError(@NonNull CameraDevice camera, int error) {
-				Log.i(MainActivity.LOG_TAG, "Error on camera with id:"+activeCameraDevice.getId()+", error: "+error);
-			}
-		});
-	}
-
-	private void printCharacteristics(String cameraID) throws CameraAccessException {
-		// Получения характеристик камеры
-		CameraCharacteristics cc = mCameraManager.getCameraCharacteristics(cameraID);
-		// Получения списка выходного формата, который поддерживает камера
-		StreamConfigurationMap configurationMap =
-				cc.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-
-		// Получения списка разрешений которые поддерживаются для формата jpeg
-		Size[] sizesJPEG = configurationMap.getOutputSizes(ImageFormat.JPEG);
-
-		if (sizesJPEG != null) {
-			for (Size item : sizesJPEG) {
-				Log.i(LOG_TAG, "w:" + item.getWidth() + " h:" + item.getHeight());
-			}
-		} else {
-			Log.e(LOG_TAG, "camera with id: " + cameraID + " don`t support JPEG");
+		// Hide the window title.
+		getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+		requestWindowFeature(Window.FEATURE_NO_TITLE);
+		setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+		if(checkPermission()) {
+			setContentView(R.layout.activity_main2);
+			TextureView textureView = (TextureView)findViewById(R.id.textureView);
+			textureView.setAlpha(0);
+			//TextureView textureView = new TextureView(this);
+			//surfaceView = (MySurfaceView) findViewById(R.id.mySurfaceView);
+			surfaceView = new MySurfaceView(this);
+			surfaceView.setTextureView(textureView);
+			LinearLayout layout = (LinearLayout) findViewById(R.id.lllayout);
+			layout.addView(surfaceView);
+			ViewGroup.LayoutParams layoutParams = textureView.getLayoutParams();
+			layoutParams.height = 1;
+			textureView.setLayoutParams(layoutParams);
 		}
 	}
 
-	public void openCamera(CameraManager mCameraManager, String mCameraID, CameraDevice.StateCallback mCameraCallback) {
-		try {
-			if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-				Toast.makeText(this, "NOT ENOUGH PERMISSIONS!", Toast.LENGTH_LONG).show();
-				finish();
-			}
+	private boolean checkPermission(){
+		// Here, thisActivity is the current activity
+		if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+				!= PackageManager.PERMISSION_GRANTED) {
 
-			mCameraManager.openCamera(mCameraID, mCameraCallback, null);
-		} catch (CameraAccessException e) {
-			Log.e(MainActivity.LOG_TAG,e.getMessage());
-			//e.printStackTrace();
-		}
+			// Should we show an explanation?
+			if (ActivityCompat.shouldShowRequestPermissionRationale(this,
+					Manifest.permission.READ_CONTACTS)) {
+				Toast.makeText(this, "Camera permission needed to work with the app", Toast.LENGTH_LONG).show();
+
+			} else {
+
+				// No explanation needed, we can request the permission.
+
+				ActivityCompat.requestPermissions(this,
+						new String[]{Manifest.permission.CAMERA},
+						REQUEST_PERMISSION_CAMERA);
+
+				// MY_PERMISSIONS_REQUEST_READ_CONTACTS is an
+				// app-defined int constant. The callback method gets the
+				// result of the request.
+			}
+		} else
+			return true;
+		return false;
 	}
 
-	private void createCameraPreviewSession() {
-		SurfaceTexture texture = textureView.getSurfaceTexture();
-		texture.setDefaultBufferSize(1920,1080);
-		Surface surface = new Surface(texture);
-
-		try {
-			final CaptureRequest.Builder builder =
-					activeCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
-
-			builder.addTarget(surface);
-
-			activeCameraDevice.createCaptureSession(
-					Arrays.asList(surface),
-					new CameraCaptureSession.StateCallback() {
-
-						@Override
-						public void onConfigured(CameraCaptureSession session) {
-							mSession = session;
-							try {
-								mSession.setRepeatingRequest(builder.build(),null,null);
-							} catch (CameraAccessException e) {
-								e.printStackTrace();
-							}
-						}
-
-						@Override
-						public void onConfigureFailed(CameraCaptureSession session) {
-						}
-
-					},
-					null
-
-			);
-		} catch (CameraAccessException e) {
-			e.printStackTrace();
+	//@Override
+	public void onRequestPermissionsResult(int requestCode,
+										   String permissions[], int[] grantResults) {
+		switch (requestCode) {
+			case REQUEST_PERMISSION_CAMERA: {
+				// If request is cancelled, the result arrays are empty.
+				if (grantResults.length > 0
+						&& grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+					//setContentView(new MySurfaceView(this));
+				} else {
+					Toast.makeText(this, "Permission needed :'(", Toast.LENGTH_LONG).show();
+				}
+				return;
+			}
 		}
-
 	}
 }

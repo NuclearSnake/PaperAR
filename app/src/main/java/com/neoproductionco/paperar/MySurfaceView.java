@@ -46,11 +46,16 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 	private Toast toast;
 	private View blur;
 	private boolean QRmode = false;
+	private Scenario scenario = new Scenario("Cook coffee");
 
 	public MySurfaceView(Context context, AttributeSet attrs, View blur) {
 		super(context, attrs);
 		this.context = context;
 		this.blur = blur;
+		scenario.addStep(new ScenarioStep("Boil water", new ScenarioStep.Color(0, 2, 28)));
+		scenario.addStep(new ScenarioStep("Melt coffee", new ScenarioStep.Color(39, 155, 97)));
+		scenario.addStep(new ScenarioStep("Bring together", new ScenarioStep.Color(0, 138, 184)));
+		scenario.addStep(new ScenarioStep("Bring together", new ScenarioStep.Color(153, 51, 51)));
 		//emulatedSurface = new SurfaceView(context);
 
 		callback = new MyPreviewCallback();
@@ -105,6 +110,11 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 		super(context);
 		this.context = context;
 		this.blur = blur;
+		scenario.addStep(new ScenarioStep("Boil water", new ScenarioStep.Color(0, 2, 28)));
+		scenario.addStep(new ScenarioStep("Melt coffee", new ScenarioStep.Color(0, 50, 15)));
+		scenario.addStep(new ScenarioStep("Bring together", new ScenarioStep.Color(0, 20, 80)));
+		scenario.addStep(new ScenarioStep("Have a nice day!", new ScenarioStep.Color(50, 0, 0)));
+		blur.setVisibility(VISIBLE);
 		//emulatedSurface = new SurfaceView(context);
 
 		callback = new MyPreviewCallback();
@@ -241,9 +251,9 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 					bmData.copyTo(RGBData);
 
 	//				GrayScaleData = step0_Prepare(RGBData);
-					//step1_Gray(RGBData); - done in the prepare step
+					//step1_GetColor(RGBData); - done in the prepare step
 				if(!QRmode)  // search for markers mode
-					step1_Gray(RGBData);
+					step1_GetColor(RGBData);
 	//				if (binarization)
 	//					step2_Bin(GrayScaleData);
 	//				if (sobel) {
@@ -260,8 +270,8 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 					bmData.copyFrom(RGBData);
 	//			}
 				bmData.copyTo(bitmap);
-				drawPreview(bitmap);
 				bmData.destroy();
+				drawPreview(bitmap);
 				if(mCamera != null)
 					mCamera.addCallbackBuffer(previewBuffer);
 			}
@@ -281,6 +291,10 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 		//parameters.setPreviewFpsRange(5000,30000);
 		Camera.Parameters parameters = mCamera.getParameters();
 		parameters.setPreviewSize(size.x, size.y);
+		parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
+		parameters.setSceneMode(Camera.Parameters.SCENE_MODE_AUTO);
+		parameters.setWhiteBalance(Camera.Parameters.WHITE_BALANCE_AUTO);
+
 		previewBuffer = new byte[parameters.getPreviewSize().height*
 				parameters.getPreviewSize().width*
 				ImageFormat.getBitsPerPixel(ImageFormat.NV21)/8];
@@ -312,21 +326,26 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 
 		yuvToRgbIntrinsic.setInput(in);
 		yuvToRgbIntrinsic.forEach(out);
+		in.destroy();
 		return out;
 	}
 
 	int frameNumber = 0;
-	public byte[] step1_Gray(byte[] input){
+	public byte[] step1_GetColor(byte[] input){
 		frameNumber++;
 		long r = 0, g = 0, b = 0, res;
 		int index = 0;
 		int pix;
+		byte r_border = 32;
+		byte g_border = 47;
+		byte b_border = 62;
+		byte a_border = 127;
 		for(int i = 0; i < size.y*4; i+=1) {
 			for (int j = 0; j < size.x; j+=4) {
-				if(i < 60 && j < 60){
-					r += input[i*size.x + j+1];
-					g += input[i*size.x + j+2];
-					b += input[i*size.x + j+3];
+				if(i % 4 == 0 && i >= size.y*2-360 && i <= size.y*2+360 && j < 180*4){
+					r += input[i*size.x + j+0];
+					g += input[i*size.x + j+1];
+					b += input[i*size.x + j+2];
 					index++;
 				}
 
@@ -336,10 +355,10 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 										(i >= size.y*2+350 && i <= size.y*2+360)
 						)
 					) {
-					input[i * size.x + j + 0] = 127;
-					input[i * size.x + j + 1] = 127;
-					input[i * size.x + j + 2] = 127;
-					input[i * size.x + j + 3] = 127;
+					input[i * size.x + j + 0] = r_border;
+					input[i * size.x + j + 1] = g_border;
+					input[i * size.x + j + 2] = b_border;
+					input[i * size.x + j + 3] = a_border;
 				}
 
 				if( i >= size.y*2-360 && i <= size.y*2+360 && i % 4 == 0 &&
@@ -348,10 +367,10 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 										(j >= 180*4-10 && j <= 180*4)
 						)
 						) {
-					input[i * size.x + j + 0] = 127;
-					input[i * size.x + j + 1] = 127;
-					input[i * size.x + j + 2] = 127;
-					input[i * size.x + j + 3] = 127;
+					input[i * size.x + j + 0] = r_border;
+					input[i * size.x + j + 1] = g_border;
+					input[i * size.x + j + 2] = b_border;
+					input[i * size.x + j + 3] = a_border;
 				}
 
 //                r *= 0.21;
@@ -364,15 +383,16 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 		g /= index;
 		b /= index;
 
-		if(frameNumber % 40 == 0)
+		if(frameNumber % 10 == 9)
 			frameNumber = 0;
 		else
 			return input;
 		if(toast != null)
 			toast.cancel();
 
-		if( r < 100 && g < 100 && b < 100) {
-			toast = Toast.makeText(context, "r = "+r+", g = "+g+", b = "+b, Toast.LENGTH_SHORT);
+		int decision = scenario.compareColor((int)r, (int)g, (int)b);
+		if(decision != -1) {
+			toast = Toast.makeText(context, "Decision = "+scenario.getStep(decision), Toast.LENGTH_SHORT);
 		} else {
 			toast = Toast.makeText(context, "r = "+r+", g = "+g+", b = "+b, Toast.LENGTH_SHORT);
 		}
@@ -487,7 +507,7 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 		canvas = holder.lockCanvas();
 		if (canvas != null){
 			if(bitmap != null){
-				int x = bitmap.getWidth(), y = bitmap.getHeight();
+ 				int x = bitmap.getWidth(), y = bitmap.getHeight();
 				int x2 = 1, y2 = 1;
 				if(y < x){
 					y2 = size.y;

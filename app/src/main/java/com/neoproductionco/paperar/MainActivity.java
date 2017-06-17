@@ -28,6 +28,7 @@ public class MainActivity extends Activity {
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+//		Scenario.test();
 		// Hide the window title.
 		getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -49,6 +50,12 @@ public class MainActivity extends Activity {
 			layoutParams.height = 1;
 			textureView.setLayoutParams(layoutParams);
 		}
+	}
+
+	@Override
+	protected void onStop() {
+		surfaceView.surfaceDestroyed(surfaceView.getHolder());
+		super.onStop();
 	}
 
 	private boolean checkPermission(){

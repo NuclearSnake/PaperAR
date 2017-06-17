@@ -4,18 +4,16 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
+import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.view.TextureView;
+import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
-import android.widget.LinearLayout;
+import android.widget.FrameLayout;
 import android.widget.Toast;
-
-import com.neoproductionco.paperar.MySurfaceView;
 
 /**
  * Created by Neo on 21.09.2016.
@@ -40,10 +38,13 @@ public class MainActivity extends Activity {
 			textureView.setAlpha(0);
 			//TextureView textureView = new TextureView(this);
 			//surfaceView = (MySurfaceView) findViewById(R.id.mySurfaceView);
-			surfaceView = new MySurfaceView(this);
+			View blur = getLayoutInflater().inflate(R.layout.activity_main, null);
+			blur.setVisibility(View.GONE);
+			surfaceView = new MySurfaceView(this, blur);
 			surfaceView.setTextureView(textureView);
-			LinearLayout layout = (LinearLayout) findViewById(R.id.lllayout);
+			FrameLayout layout = (FrameLayout) findViewById(R.id.lllayout);
 			layout.addView(surfaceView);
+			layout.addView(blur);
 			ViewGroup.LayoutParams layoutParams = textureView.getLayoutParams();
 			layoutParams.height = 1;
 			textureView.setLayoutParams(layoutParams);

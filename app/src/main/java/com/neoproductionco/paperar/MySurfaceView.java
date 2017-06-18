@@ -21,17 +21,17 @@ import android.renderscript.RenderScript;
 import android.renderscript.ScriptIntrinsicYuvToRGB;
 import android.renderscript.Type;
 import android.text.TextUtils;
-import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Display;
-import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import net.sourceforge.zbar.Config;
 import net.sourceforge.zbar.Image;
 import net.sourceforge.zbar.ImageScanner;
 import net.sourceforge.zbar.Symbol;
@@ -42,46 +42,45 @@ import java.util.List;
 
 //import com.google.firebase.crash.FirebaseCrash;
 
-public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback, View.OnTouchListener, TextureView.SurfaceTextureListener {
+public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback, TextureView.SurfaceTextureListener, View.OnClickListener {
 	private Toast toast;
 	private View blur;
+	private TextView tvName;
+	private final TextView tvStep;
 	private boolean QRmode = false;
 	private Scenario scenario = new Scenario("Cook coffee");
+	private ImageScanner scanner;
 
-	public MySurfaceView(Context context, AttributeSet attrs, View blur) {
-		super(context, attrs);
-		this.context = context;
-		this.blur = blur;
-		scenario.addStep(new ScenarioStep("Boil water", new ScenarioStep.Color(0, 2, 28)));
-		scenario.addStep(new ScenarioStep("Melt coffee", new ScenarioStep.Color(39, 155, 97)));
-		scenario.addStep(new ScenarioStep("Bring together", new ScenarioStep.Color(0, 138, 184)));
-		scenario.addStep(new ScenarioStep("Bring together", new ScenarioStep.Color(153, 51, 51)));
-		//emulatedSurface = new SurfaceView(context);
-
-		callback = new MyPreviewCallback();
-		setOnTouchListener(this);
-		options.inPreferredConfig = Bitmap.Config.ARGB_8888;
-		options.inSampleSize = 8;
-
-		holder = this.getHolder();
-		holder.addCallback(this);
-		holder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
-		//this.textureView = textureView;//new TextureView(context);
-		//this.textureView.setSurfaceTextureListener(this);
-//        if (textureView.isAvailable()) {
-//            onSurfaceTextureAvailable(textureView.getSurfaceTexture(), textureView.getWidth(), textureView.getHeight());
-//        }
-		//holder.setFormat(ImageFormat.RG);
-		WindowManager wm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
-		Display display = wm.getDefaultDisplay();
-		size = new Point();
-		display.getSize(size);
-		size.set(1280,720);
-		RGBData = new byte[size.x * size.y * 4];
-		GrayScaleData = new int[size.x * size.y];
-		holder.setFixedSize(size.x, size.y);
-
-	}
+//	public MySurfaceView(Context context, AttributeSet attrs, View blur) {
+//		super(context, attrs);
+//		this.context = context;
+//		this.blur = blur;
+//		//emulatedSurface = new SurfaceView(context);
+//
+//		callback = new MyPreviewCallback();
+//		setOnTouchListener(this);
+//		options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+//		options.inSampleSize = 8;
+//
+//		holder = this.getHolder();
+//		holder.addCallback(this);
+//		holder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+//		//this.textureView = textureView;//new TextureView(context);
+//		//this.textureView.setSurfaceTextureListener(this);
+////        if (textureView.isAvailable()) {
+////            onSurfaceTextureAvailable(textureView.getSurfaceTexture(), textureView.getWidth(), textureView.getHeight());
+////        }
+//		//holder.setFormat(ImageFormat.RG);
+//		WindowManager wm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+//		Display display = wm.getDefaultDisplay();
+//		size = new Point();
+//		display.getSize(size);
+//		size.set(1280,720);
+//		RGBData = new byte[size.x * size.y * 4];
+//		GrayScaleData = new int[size.x * size.y];
+//		holder.setFixedSize(size.x, size.y);
+//
+//	}
 
 
 	private static final int REQUEST_PERMISSION_CAMERA = 1045;
@@ -106,19 +105,37 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 	Context context = null;
 	//SurfaceView emulatedSurface;
 
-	public MySurfaceView(Context context, View blur){//, Size size) {
+	public void setQRMode(boolean value){
+		QRmode = value;
+		if(QRmode) {
+			blur.setVisibility(GONE);
+			tvName.setVisibility(GONE);
+		} else {
+			blur.setVisibility(VISIBLE);
+			tvName.setVisibility(VISIBLE);
+		}
+	}
+
+	public MySurfaceView(Context context, View blur, TextView tvName, TextView tvStep, String script){//, Size size) {
 		super(context);
+		this.tvStep = tvStep;
 		this.context = context;
 		this.blur = blur;
-		scenario.addStep(new ScenarioStep("Boil water", new ScenarioStep.Color(0, 2, 28)));
-		scenario.addStep(new ScenarioStep("Melt coffee", new ScenarioStep.Color(0, 50, 15)));
-		scenario.addStep(new ScenarioStep("Bring together", new ScenarioStep.Color(0, 20, 80)));
-		scenario.addStep(new ScenarioStep("Have a nice day!", new ScenarioStep.Color(50, 0, 0)));
-		blur.setVisibility(VISIBLE);
+		this.tvName = tvName;
+		setQRMode(QRmode);
+		System.loadLibrary( "iconv" );
+		scanner = new ImageScanner();
+		scanner.setConfig(Symbol.QRCODE, Config.ENABLE, 1);
+
+		scenario = Scenario.prepareScenario(script);
+		tvName.setText(scenario.getName());
+//		scenario.addStep(new ScenarioStep("Boil water", new ScenarioStep.Color(0, 2, 28)));
+//		scenario.addStep(new ScenarioStep("Melt coffee", new ScenarioStep.Color(0, 50, 15)));
+//		scenario.addStep(new ScenarioStep("Bring together", new ScenarioStep.Color(0, 20, 80)));
+//		scenario.addStep(new ScenarioStep("Have a nice day!", new ScenarioStep.Color(50, 0, 0)));
 		//emulatedSurface = new SurfaceView(context);
 
 		callback = new MyPreviewCallback();
-		setOnTouchListener(this);
 		options.inPreferredConfig = Bitmap.Config.ARGB_8888;
 		options.inSampleSize = 8;
 
@@ -189,6 +206,17 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 		this.textureView.setSurfaceTextureListener(this);
 	}
 
+	@Override
+	public void onClick(View v) {
+		switch (v.getId()){
+			case R.id.btnCancel:
+				setQRMode(true);
+				break;
+			case 13: // Last scenario
+				setQRMode(false);
+		}
+	}
+
 //    @Override
 //    protected void onCreate(Bundle savedInstanceState) {
 //        super.onCreate(savedInstanceState);
@@ -203,15 +231,14 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 		//private long timestamp=0;
 		@Override
 		public void onPreviewFrame(byte[] bytes, Camera camera) {
-			if(QRmode){
+			if(QRmode) {
 				Camera.Parameters parameters = camera.getParameters();
 				Camera.Size size = parameters.getPreviewSize();
 
-				System.loadLibrary( "iconv" );
+				System.loadLibrary("iconv");
 				Image barcode = new Image(size.width, size.height, "Y800");
 				barcode.setData(bytes);
 
-				ImageScanner scanner = new ImageScanner();
 				int result = scanner.scanImage(barcode);
 
 				if (result != 0) {
@@ -226,7 +253,7 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 					for (Symbol sym : syms) {
 						String symData = sym.getData();
 						if (!TextUtils.isEmpty(symData)) {
-							Log.d("LOGS", "Result = "+symData);
+							Log.d("LOGS", "Result = " + symData);
 							processBarcode(sym);
 							Toast.makeText(context, symData, Toast.LENGTH_SHORT).show();
 //                    Intent dataIntent = new Intent();
@@ -237,10 +264,10 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 							break;
 						}
 					}
-				} else;
+				} else ;
 //            tvScanned.setText("NO");
-
-			} else {
+			}
+//			} else {
 				//Log.v("CameraTest","Time Gap = "+(System.currentTimeMillis()-timestamp));
 				//timestamp=System.currentTimeMillis();
 				//decodeYUV420SP(RGBData, bytes, size.x, size.y); - very slow!!!
@@ -274,12 +301,29 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 				drawPreview(bitmap);
 				if(mCamera != null)
 					mCamera.addCallbackBuffer(previewBuffer);
-			}
+//			}
 		}
 	}
 
 	private void processBarcode(Symbol sym) {
 		// TODO: 17.06.2017 Make this :)
+		String text = sym.getData();
+		String[] lines = text.split("\n");
+		if(lines.length < 2) {
+			Toast.makeText(context, "Bad QR", Toast.LENGTH_SHORT).show();
+			return;
+		}
+
+		scenario = new Scenario(lines[0]);
+		String[] line;
+		for(int i = 1; i < lines.length; i++) {
+			try {
+				line = lines[i].split("\\W");
+				scenario.addStep(new ScenarioStep(line[3], new ScenarioStep.Color(Integer.parseInt(line[2]), Integer.parseInt(line[1]), Integer.parseInt(line[0]))));
+			} catch	(Exception e){
+				e.printStackTrace();
+			}
+		}
 	}
 
 	public void start(){
@@ -331,15 +375,21 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 	}
 
 	int frameNumber = 0;
+	int stepNumber = 0;
 	public byte[] step1_GetColor(byte[] input){
 		frameNumber++;
 		long r = 0, g = 0, b = 0, res;
 		int index = 0;
 		int pix;
-		byte r_border = 32;
-		byte g_border = 47;
-		byte b_border = 62;
+
+		byte r_border = (byte)scenario.getStep(stepNumber).getColor().r;
+		byte g_border = (byte)scenario.getStep(stepNumber).getColor().g;
+		byte b_border = (byte)scenario.getStep(stepNumber).getColor().b;
 		byte a_border = 127;
+//		byte r_border = 32;
+//		byte g_border = 47;
+//		byte b_border = 62;
+//		byte a_border = 127;
 		for(int i = 0; i < size.y*4; i+=1) {
 			for (int j = 0; j < size.x; j+=4) {
 				if(i % 4 == 0 && i >= size.y*2-360 && i <= size.y*2+360 && j < 180*4){
@@ -387,69 +437,67 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 			frameNumber = 0;
 		else
 			return input;
-		if(toast != null)
-			toast.cancel();
+//		if(toast != null)
+//			toast.cancel();
 
 		int decision = scenario.compareColor((int)r, (int)g, (int)b);
 		if(decision != -1) {
-			toast = Toast.makeText(context, "Decision = "+scenario.getStep(decision), Toast.LENGTH_SHORT);
+			if(decision == stepNumber && scenario.size() > stepNumber+1)
+				stepNumber ++; // to the next step (border)
+			tvStep.setText("Step "+decision+": "+scenario.getStepName(decision));
+			tvStep.setVisibility(VISIBLE);
+//			toast = Toast.makeText(context, "Decision = "+scenario.getStepName(decision), Toast.LENGTH_SHORT);
 		} else {
-			toast = Toast.makeText(context, "r = "+r+", g = "+g+", b = "+b, Toast.LENGTH_SHORT);
+//			toast = Toast.makeText(context, "r = "+r+", g = "+g+", b = "+b, Toast.LENGTH_SHORT);
+			tvStep.setVisibility(GONE);
 		}
-		toast.show();
+//		toast.show();
 
 		return input;
 	}
 
-	public byte[] step1_GrayByte(byte[] input){
-		long r, g, b, res;
-		int pix;
-		for(int i = 0; i < size.y*4; i+=1) {
-			for (int j = 0; j < size.x; j+=4) {
-				r = input[i*size.x + j+0];
-				g = input[i*size.x + j+1];
-				b = input[i*size.x + j+2];
-
-				res = (r + g + b)/3;
-
-//                r *= 0.21;
-//                g *= 0.72;
-//                b *= 0.07;
-
-				input[i*size.x+j+0] = (byte)res;
-				input[i*size.x+j+1] = (byte)res;
-				input[i*size.x+j+2] = (byte)res;
-			}
-		}
-		return input;
-	}
-
-	public static int[] step0_Prepare(byte[] input){
-		int result[] = new int[input.length/4];
-		for(int i = 0; i < input.length; i+=4)
-			// result [i/4] = avg(r+g+b), ignoring alpha
-			result[i/4] = (input[i] + input[i+1] + input[i+2])/3;
-		return result;
-	}
-
-	public static byte[] step0_PrepareByte(byte[] input){
-		int result[] = new int[input.length/4];
-		long r = 0, g = 0, b = 0;
-		for(int i = 0; i < input.length; i+=4)
-			// result [i/4] = avg(r+g+b), ignoring alpha
-			if(i == 0);
+//	public byte[] step1_GrayByte(byte[] input){
+//		long r, g, b, res;
+//		int pix;
+//		for(int i = 0; i < size.y*4; i+=1) {
+//			for (int j = 0; j < size.x; j+=4) {
+//				r = input[i*size.x + j+0];
+//				g = input[i*size.x + j+1];
+//				b = input[i*size.x + j+2];
+//
+//				res = (r + g + b)/3;
+//
+////                r *= 0.21;
+////                g *= 0.72;
+////                b *= 0.07;
+//
+//				input[i*size.x+j+0] = (byte)res;
+//				input[i*size.x+j+1] = (byte)res;
+//				input[i*size.x+j+2] = (byte)res;
+//			}
+//		}
+//		return input;
+//	}
+//
+//	public static int[] step0_Prepare(byte[] input){
+//		int result[] = new int[input.length/4];
+//		for(int i = 0; i < input.length; i+=4)
+//			// result [i/4] = avg(r+g+b), ignoring alpha
 //			result[i/4] = (input[i] + input[i+1] + input[i+2])/3;
-		return input;
-	}
-
-	public static byte[] step0_PrepareOutput(int[] input){
-		byte result[] = new byte[input.length*4];
-		for(int i = 0; i < input.length*4; i+=4){
-			// setting r,g,b; alpha is always 100%
-			result[i] = result[i + 1] = result[i + 2] = (byte)input[i/4];
-			result[i+3] = (byte)255;
-		}
-		return result;
+//		return result;
+//	}
+//
+//	public static byte[] step0_PrepareByte(byte[] input){
+//		int result[] = new int[input.length/4];
+//		long r = 0, g = 0, b = 0;
+//		for(int i = 0; i < input.length; i+=4)
+//			// result [i/4] = avg(r+g+b), ignoring alpha
+//			if(i == 0);
+////			result[i/4] = (input[i] + input[i+1] + input[i+2])/3;
+//		return input;
+//	}
+//
+//	public static byte[] step0_PrepareOutput(int[] input){
 //		byte result[] = new byte[input.length*4];
 //		for(int i = 0; i < input.length*4; i+=4){
 //			// setting r,g,b; alpha is always 100%
@@ -457,51 +505,58 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 //			result[i+3] = (byte)255;
 //		}
 //		return result;
-	}
-
-	public int[] step2_Bin(int[] input){
-		int treshold = otsuThreshold(input);
-		for(int i = 0; i < input.length; i++)
-			input[i] = (input[i] > treshold)?0:255;
-		return input;
-	}
-
-	public int[] step3_Fields(int[] input){
-		int gx, gy, f;
-		int result[] = new int[input.length];
-		for(int i = 0; i < size.y; i++)
-			for (int j = 0; j < size.x; j++) {
-				if(i == 0 || i == size.y-1 || j == 0 || j == size.x-1) {
-					result[i * size.x + j] = 0;
-					continue;
-				}
-
-				// GX
-				gx = (input[(i + 1) * size.x + j - 1] + 2 * input[(i + 1) * size.x + j] + input[(i + 1) * size.x + j + 1]) -
-						(input[(i - 1) * size.x + j - 1] + 2 * input[(i - 1) * size.x + j] + input[(i - 1) * size.x + j + 1]);
-				// GY
-				gy = (input[(i - 1) * size.x + j + 1] + 2 * input[i * size.x + j + 1] + input[(i + 1) * size.x + j + 1]) -
-						(input[(i - 1) * size.x + j - 1] + 2 * input[i * size.x + j - 1] + input[(i + 1) * size.x + j - 1]);
-				f = (int) Math.sqrt(Math.pow(gx, 2) + Math.pow(gy, 2));
-				if(f != 0 && f!= 255 && (i * size.x + j < 5000))
-					Log.d("Hi", "value "+f+" at "+(i * size.x + j));
-				result[i * size.x + j] = f;
-			}
-		return result;
-	}
-
-	public static int[] step3_Normalize(int[] input){
-		int max = -256;
-		for(int i = 0; i < input.length; i++)
-			if(max < input[i]) max = input[i];
-		for(int i = 0; i < input.length; i++)
-			input[i] = (int)(((double)input[i])/max*255);
-		return input;
-	}
-
-	public void step4_Contures(){};
-	public void step5_Corners(){};
-	public void step6_Coordinates(){};
+////		byte result[] = new byte[input.length*4];
+////		for(int i = 0; i < input.length*4; i+=4){
+////			// setting r,g,b; alpha is always 100%
+////			result[i] = result[i + 1] = result[i + 2] = (byte)input[i/4];
+////			result[i+3] = (byte)255;
+////		}
+////		return result;
+//	}
+//
+//	public int[] step2_Bin(int[] input){
+//		int treshold = otsuThreshold(input);
+//		for(int i = 0; i < input.length; i++)
+//			input[i] = (input[i] > treshold)?0:255;
+//		return input;
+//	}
+//
+//	public int[] step3_Fields(int[] input){
+//		int gx, gy, f;
+//		int result[] = new int[input.length];
+//		for(int i = 0; i < size.y; i++)
+//			for (int j = 0; j < size.x; j++) {
+//				if(i == 0 || i == size.y-1 || j == 0 || j == size.x-1) {
+//					result[i * size.x + j] = 0;
+//					continue;
+//				}
+//
+//				// GX
+//				gx = (input[(i + 1) * size.x + j - 1] + 2 * input[(i + 1) * size.x + j] + input[(i + 1) * size.x + j + 1]) -
+//						(input[(i - 1) * size.x + j - 1] + 2 * input[(i - 1) * size.x + j] + input[(i - 1) * size.x + j + 1]);
+//				// GY
+//				gy = (input[(i - 1) * size.x + j + 1] + 2 * input[i * size.x + j + 1] + input[(i + 1) * size.x + j + 1]) -
+//						(input[(i - 1) * size.x + j - 1] + 2 * input[i * size.x + j - 1] + input[(i + 1) * size.x + j - 1]);
+//				f = (int) Math.sqrt(Math.pow(gx, 2) + Math.pow(gy, 2));
+//				if(f != 0 && f!= 255 && (i * size.x + j < 5000))
+//					Log.d("Hi", "value "+f+" at "+(i * size.x + j));
+//				result[i * size.x + j] = f;
+//			}
+//		return result;
+//	}
+//
+//	public static int[] step3_Normalize(int[] input){
+//		int max = -256;
+//		for(int i = 0; i < input.length; i++)
+//			if(max < input[i]) max = input[i];
+//		for(int i = 0; i < input.length; i++)
+//			input[i] = (int)(((double)input[i])/max*255);
+//		return input;
+//	}
+//
+//	public void step4_Contures(){};
+//	public void step5_Corners(){};
+//	public void step6_Coordinates(){};
 
 	private void drawPreview(Bitmap bitmap){
 		canvas = holder.lockCanvas();
@@ -523,34 +578,34 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 		}
 	}
 
-	static public void decodeYUV420SP(int[] rgb, byte[] yuv420sp, int width, int height) {
-		final int frameSize = width * height;
-		for (int j = 0, yp = 0; j <height; j++) {
-			int uvp = frameSize + (j >> 1) * width, u = 0, v = 0;
-			for (int i = 0; i <width; i++, yp++) {
-				int y = (0xff & ((int) yuv420sp[yp])) - 16;
-				if (y <0)y = 0;
-				if ((i & 1) == 0) {
-					v = (0xff & yuv420sp[uvp++]) - 128;
-					u = (0xff & yuv420sp[uvp++]) - 128;
-				}
-
-				int y1192 = 1192 * y;
-				int r = (y1192 + 1634 * v);
-				int g = (y1192 - 833 * v - 400 * u);
-				int b = (y1192 + 2066 * u);
-
-				if (r <0)r = 0;
-				else if (r > 262143)r = 262143;
-				if (g <0)g = 0;
-				else if (g > 262143)g = 262143;
-				if (b <0)b = 0;
-				else if (b > 262143)
-					b = 262143;
-				rgb[yp] = 0xff000000 | ((r <<6) & 0xff0000) | ((g >> 2) & 0xff00) | ((b >> 10) & 0xff);
-			}
-		}
-	}
+//	static public void decodeYUV420SP(int[] rgb, byte[] yuv420sp, int width, int height) {
+//		final int frameSize = width * height;
+//		for (int j = 0, yp = 0; j <height; j++) {
+//			int uvp = frameSize + (j >> 1) * width, u = 0, v = 0;
+//			for (int i = 0; i <width; i++, yp++) {
+//				int y = (0xff & ((int) yuv420sp[yp])) - 16;
+//				if (y <0)y = 0;
+//				if ((i & 1) == 0) {
+//					v = (0xff & yuv420sp[uvp++]) - 128;
+//					u = (0xff & yuv420sp[uvp++]) - 128;
+//				}
+//
+//				int y1192 = 1192 * y;
+//				int r = (y1192 + 1634 * v);
+//				int g = (y1192 - 833 * v - 400 * u);
+//				int b = (y1192 + 2066 * u);
+//
+//				if (r <0)r = 0;
+//				else if (r > 262143)r = 262143;
+//				if (g <0)g = 0;
+//				else if (g > 262143)g = 262143;
+//				if (b <0)b = 0;
+//				else if (b > 262143)
+//					b = 262143;
+//				rgb[yp] = 0xff000000 | ((r <<6) & 0xff0000) | ((g >> 2) & 0xff00) | ((b >> 10) & 0xff);
+//			}
+//		}
+//	}
 
 	@Override
 	public void surfaceCreated(SurfaceHolder surfaceHolder) {
@@ -604,6 +659,10 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 
 	@Override
 	public void surfaceDestroyed(SurfaceHolder surfaceHolder) {
+		releaseResources();
+	}
+
+	public void releaseResources() {
 		if (mCamera != null) {
 			mCamera.stopPreview();
 			this.getHolder().removeCallback(this);
@@ -614,82 +673,82 @@ public class MySurfaceView extends SurfaceView implements SurfaceHolder.Callback
 	}
 
 	/* Функция возвращает порог бинаризации для полутонового изображения image с общим числом пикселей size */
-	int otsuThreshold(int[] image){
-		int min=image[0], max=min;
-		int i, temp, temp1;
-		int hist[];
-		int histSize;
+//	int otsuThreshold(int[] image){
+//		int min=image[0], max=min;
+//		int i, temp, temp1;
+//		int hist[];
+//		int histSize;
+//
+//		int alpha, beta, threshold=0;
+//		double sigma, maxSigma=-1;
+//		double w1,a;
+//
+//		/**** Построение гистограммы ****/
+//        /* Узнаем наибольший и наименьший полутон */
+//		for(i=1;i<image.length;i+=1)
+//		{
+//			temp=image[i];
+//			if(temp<min)   min = temp;
+//			if(temp>max)   max = temp;
+//		}
+//
+//		histSize=max-min+1;
+//		hist = new int[histSize];
+//
+//		for(i=0;i<histSize;i++)
+//			hist[i]=0;
+//
+//        /* Считаем сколько каких полутонов */
+//		for(i=0;i<image.length;i+=1)
+//			hist[ image[i] - min ]++;
+//
+//		/**** Гистограмма построена ****/
+//
+//		temp=temp1=0;
+//		alpha=beta=0;
+//        /* Для расчета математического ожидания первого класса */
+//		for(i=0;i<=(max-min);i++){
+//			temp += i*hist[i];
+//			temp1 += hist[i];
+//		}
+//
+//        /* Основной цикл поиска порога
+//        Пробегаемся по всем полутонам для поиска такого, при котором внутриклассовая дисперсия минимальна */
+//		for(i=0;i<(max-min);i++)
+//		{
+//			alpha+= i*hist[i];
+//			beta+=hist[i];
+//
+//			w1 = (double)beta / temp1;
+//			a = (double)alpha / beta - (double)(temp - alpha) / (temp1 - beta);
+//			sigma=w1*(1-w1)*a*a;
+//
+//			if(sigma>maxSigma)
+//			{
+//				maxSigma=sigma;
+//				threshold=i;
+//			}
+//		}
+//		hist = null;
+//		return threshold + min;
+//	}
 
-		int alpha, beta, threshold=0;
-		double sigma, maxSigma=-1;
-		double w1,a;
-
-		/**** Построение гистограммы ****/
-        /* Узнаем наибольший и наименьший полутон */
-		for(i=1;i<image.length;i+=1)
-		{
-			temp=image[i];
-			if(temp<min)   min = temp;
-			if(temp>max)   max = temp;
-		}
-
-		histSize=max-min+1;
-		hist = new int[histSize];
-
-		for(i=0;i<histSize;i++)
-			hist[i]=0;
-
-        /* Считаем сколько каких полутонов */
-		for(i=0;i<image.length;i+=1)
-			hist[ image[i] - min ]++;
-
-		/**** Гистограмма построена ****/
-
-		temp=temp1=0;
-		alpha=beta=0;
-        /* Для расчета математического ожидания первого класса */
-		for(i=0;i<=(max-min);i++){
-			temp += i*hist[i];
-			temp1 += hist[i];
-		}
-
-        /* Основной цикл поиска порога
-        Пробегаемся по всем полутонам для поиска такого, при котором внутриклассовая дисперсия минимальна */
-		for(i=0;i<(max-min);i++)
-		{
-			alpha+= i*hist[i];
-			beta+=hist[i];
-
-			w1 = (double)beta / temp1;
-			a = (double)alpha / beta - (double)(temp - alpha) / (temp1 - beta);
-			sigma=w1*(1-w1)*a*a;
-
-			if(sigma>maxSigma)
-			{
-				maxSigma=sigma;
-				threshold=i;
-			}
-		}
-		hist = null;
-		return threshold + min;
-	}
-
-	@Override
-	public boolean onTouch(View v, MotionEvent event) {
-		switch(event.getAction()){
-			case MotionEvent.ACTION_DOWN:
-				if(event.getX() < size.x/3) // first 1/3
-					grayscale = ! grayscale;
-				else
-				if(event.getX() > 2*size.x/3) // last 1/3
-					sobel = ! sobel;
-				else
-					binarization = !binarization; // middle
-
-
-		}
-		return false;
-	}
+//	@Override
+//	public boolean onTouch(View v, MotionEvent event) {
+//		switch(event.getAction()){
+//			case MotionEvent.ACTION_DOWN:
+//				if(event.getX() < size.x/3) // first 1/3
+//					grayscale = ! grayscale;
+//				else
+//				if(event.getX() > 2*size.x/3) // last 1/3
+//					sobel = ! sobel;
+//				else
+//					binarization = !binarization; // middle
+//
+//
+//		}
+//		return false;
+//	}
 }
 
 // Code to convert from the byte[] RGB_565 array to real R, G & B values

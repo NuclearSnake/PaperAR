@@ -1,6 +1,7 @@
 package com.neoproductionco.paperar;
 
 import android.util.Log;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 
@@ -12,21 +13,37 @@ public class Scenario {
 	String name;
 	ArrayList<ScenarioStep> steps;
 
+	public String getName() {
+		return name;
+	}
+
 	public Scenario(String name) {
 		this.name = name;
 		this.steps = new ArrayList<>();
+	}
+
+	public int size(){
+		return steps.size();
 	}
 
 	public void addStep(ScenarioStep newStep){
 		steps.add(newStep);
 	}
 
-	public String getStep(int number){
+	public String getStepName(int number){
 		if(number >= 0 && number < steps.size())
 			return steps.get(number).getName();
 		else
 			return null;
 	}
+
+	public ScenarioStep getStep(int number){
+		if(number >= 0 && number < steps.size())
+			return steps.get(number);
+		else
+			return null;
+	}
+
 
 	public int compareColor(int r, int g, int b){
 		for(int i = 0; i < steps.size(); i++){
@@ -48,6 +65,28 @@ public class Scenario {
 			return true;
 		else
 			return false;
+	}
+
+	public static Scenario prepareScenario(String text){
+		String[] lines = text.split("\n");
+		if(lines.length < 2) {
+			return null;
+		}
+
+		Scenario scenario = new Scenario(lines[0]);
+		String[] line;
+		String[] colors;
+		for(int i = 1; i < lines.length; i++) {
+			try {
+				line = lines[i].split(":");
+				colors = line[0].split("\\W+");
+				scenario.addStep(new ScenarioStep(line[1], new ScenarioStep.Color(Integer.parseInt(colors[0]), Integer.parseInt(colors[1]), Integer.parseInt(colors[2]))));
+			} catch	(Exception e){
+				e.printStackTrace();
+			}
+		}
+
+		return scenario.size() > 0 ? scenario : null;
 	}
 
 	public static void test(){

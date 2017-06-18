@@ -2,6 +2,7 @@ package com.neoproductionco.paperar;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
@@ -12,17 +13,25 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 /**
  * Created by Neo on 21.09.2016.
  */
 
-public class MainActivity extends Activity {
+public class InstructionActivity extends Activity {
 	private static final int REQUEST_PERMISSION_CAMERA = 1045;
 
 	MySurfaceView surfaceView;
+
+	@Override
+	public void onBackPressed() {
+		surfaceView.releaseResources();
+		finish();
+	}
 
 	/** Called when the activity is first created. */
 	@Override
@@ -33,19 +42,36 @@ public class MainActivity extends Activity {
 		getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+		Intent intent = getIntent();
+		String script = "";
+		if(intent != null){
+			script = intent.getStringExtra("script");
+		}
+
 		if(checkPermission()) {
 			setContentView(R.layout.activity_main2);
 			TextureView textureView = (TextureView)findViewById(R.id.textureView);
 			textureView.setAlpha(0);
 			//TextureView textureView = new TextureView(this);
 			//surfaceView = (MySurfaceView) findViewById(R.id.mySurfaceView);
-			View blur = getLayoutInflater().inflate(R.layout.activity_main, null);
-			blur.setVisibility(View.GONE);
-			surfaceView = new MySurfaceView(this, blur);
+			View blur = getLayoutInflater().inflate(R.layout.blur, null);
+			View instructionInterface = getLayoutInflater().inflate(R.layout.instruction_interface, null);
+			TextView tvName = (TextView) instructionInterface.findViewById(R.id.tvName);
+			TextView tvStep = (TextView) instructionInterface.findViewById(R.id.tvStep);
+			Button btnCancel = (Button) instructionInterface.findViewById(R.id.btnCancel);
+			btnCancel.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					surfaceView.releaseResources();
+					finish();
+				}
+			});
+			surfaceView = new MySurfaceView(this, blur, tvName, tvStep, script);
 			surfaceView.setTextureView(textureView);
 			FrameLayout layout = (FrameLayout) findViewById(R.id.lllayout);
 			layout.addView(surfaceView);
 			layout.addView(blur);
+			layout.addView(instructionInterface);
 			ViewGroup.LayoutParams layoutParams = textureView.getLayoutParams();
 			layoutParams.height = 1;
 			textureView.setLayoutParams(layoutParams);
@@ -65,7 +91,7 @@ public class MainActivity extends Activity {
 
 			// Should we show an explanation?
 			if (ActivityCompat.shouldShowRequestPermissionRationale(this,
-					Manifest.permission.READ_CONTACTS)) {
+					Manifest.permission.CAMERA)) {
 				Toast.makeText(this, "Camera permission needed to work with the app", Toast.LENGTH_LONG).show();
 
 			} else {
